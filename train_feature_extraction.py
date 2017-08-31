@@ -11,7 +11,7 @@ with open('train.p', 'rb') as data:
     train = pickle.load(data)
 
 X_train, X_test, y_train, y_test = train_test_split(
-    train['features'], train['labels'], test_size=0.2)
+    train['features'], train['labels'], test_size=0.33)
 
 nb_classes = np.unique(np.concatenate((y_train, y_test))).shape[0]
 
@@ -32,7 +32,7 @@ fc7 = tf.stop_gradient(fc7)
 
 # NOTE:  use this shape for the weight matrix
 shape = (fc7.get_shape().as_list()[-1], nb_classes)
-fc8W = tf.Variable(tf.truncated_normal(shape, stddev=1e-3))
+fc8W = tf.Variable(tf.truncated_normal(shape, stddev=1e-2))
 fc8b = tf.Variable(tf.zeros(nb_classes))
 logits = tf.nn.xw_plus_b(fc7, fc8W, fc8b)
 
@@ -53,22 +53,20 @@ def evaluate(X_data, y_data):
 
 rate = 0.001
 EPOCHS = 10
-BATCH_SIZE = 32
+BATCH_SIZE = 1024
 
-cross_entropy = tf.nn.softmax_cross_entropy_with_logits(
-    labels=one_hot_y, logits=logits)
+cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=y, logits=logits)
 loss_operation = tf.reduce_mean(cross_entropy)
 optimizer = tf.train.AdamOptimizer(learning_rate = rate)
-training_operation = optimizer.minimize(loss_operation)
+training_operation = optimizer.minimize(loss_operation, var_list=[fc8W, fc8b])
 
 saver = tf.train.Saver()
 
 with tf.Session() as sess:
     sess.run(tf.global_variables_initializer())
-    num_examples = len(X_train[0:100])
+    num_examples = len(X_train)
     
     print("Training...")
-    print()
     for i in range(EPOCHS):
         epoch_begin = dt.datetime.now()
         X_train, y_train = shuffle(X_train, y_train)
@@ -86,8 +84,7 @@ with tf.Session() as sess:
               "Train Accuracy = {:.3f}; Validation Accuracy = {:.3f}".
               format(
                   i+1, (epoch_end - epoch_begin).total_seconds(), 
-                  train_accuracy, keep_probability, 
-                  validation_accuracy))
+                  train_accuracy, validation_accuracy))
 
     saver.save(sess, './alexnet')
     print("Model saved")
